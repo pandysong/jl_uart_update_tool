@@ -65,6 +65,9 @@ DEBUG = 0
 
 UPGRADE_BAUDRATE = 1000000
 
+current_offset = 0x0
+total_sent = 0
+
 
 def handle_messages_loop(ser, fw):
 
@@ -91,6 +94,7 @@ def handle_messages_loop(ser, fw):
             cmd = msg[CMD_INDEX]
 
             if cmd == CMD_UART_UPDATE_START:
+                accumulated = 0
                 print(">> CMD_UART_UPDATE_START")
                 reply = cmd_packet(struct.pack("B", CMD_UART_UPDATE_START) +
                                    struct.pack("I", UPGRADE_BAUDRATE))
@@ -105,11 +109,14 @@ def handle_messages_loop(ser, fw):
                 print(">> >> change baudrate done")
             elif cmd == CMD_UART_UPDATE_READ:
 
-                print(">> CMD_UART_UPDATE_READ")
-                print(">> {}".format(msg.hex()))
+                if DEBUG:
+                    print(">> CMD_UART_UPDATE_READ")
+                    print(">> {}".format(msg.hex()))
 
                 offset, length = struct.unpack("<II", msg[1:9])
-                print("    offset {} length {}".format(offset, length))
+
+                if DEBUG:
+                    print("    offset {} length {}".format(offset, length))
                 fw.seek(offset)
                 fw_bytes = fw.read(length)
                 if DEBUG:
@@ -119,15 +126,14 @@ def handle_messages_loop(ser, fw):
                 tx_msg = msg[:9]
                 tx_msg = cmd_packet(tx_msg + fw_bytes)
                 total_sent += len(fw_bytes)
-
+                print("\r>> total sent {}".format(total_sent), end='')
+                sys.stdout.flush()
                 if DEBUG:
-                    print("total_sent {}".format(total_sent))
-                else:
                     print("<< CMD_UART_UPDATE_READ")
                 ser.write(tx_msg)     # write command
 
             elif cmd == CMD_UART_UPDATE_END:
-                print(">> CMD_UART_UPDATE_END, errcode {}".format(msg[1]))
+                print("\n>> CMD_UART_UPDATE_END, errcode {}".format(msg[1]))
                 if msg[1] == 0:
                     print("Success")
                     break
@@ -135,7 +141,7 @@ def handle_messages_loop(ser, fw):
                     print("Fail")
 
             elif cmd == CMD_UART_UPDATE_UPDATE_LEN:
-                print(">> CMD_UART_UPDATE_UPDATE_LEN")
+                print("\n>> CMD_UART_UPDATE_UPDATE_LEN")
             elif cmd == CMD_UART_JEEP_ALIVE:
                 print(">> CMD_UART_JEEP_ALIVE")
             elif cmd == CMD_UART_UPDATE_READY:
